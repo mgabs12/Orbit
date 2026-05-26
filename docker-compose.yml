@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+
+  # ── Frontend Vue/Vite ────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:80"
+    environment:
+      # Esta variable se inyecta en el build de Vite
+      # El frontend la usa para saber dónde está el backend
+      - VITE_BACKEND_URL=http://localhost:5000
+      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}=216200377868-lkl2nv2nki5a5jvskl3bvpbkbicih5ke.apps.googleusercontent.com
+    networks:
+      red_interna:
+        ipv4_address: 192.2.9.10
+    depends_on:
+      - backend
+
+  # ── Backend Flask ────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    networks:
+      red_interna:
+        ipv4_address: 192.2.9.11
+    depends_on:
+      - mongo
+    restart: on-failure
+
+  # ── Base de datos MongoDB ────────────────────────────────
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - mongo_data:/data/db
+      # Monta el script de inicialización
+      # Solo se ejecuta si el volumen está vacío (primera vez)
+      - ./database/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      red_interna:
+        ipv4_address: 192.2.9.12
+    # Sin "ports:" → MongoDB NO está expuesto al exterior
+    # Esto es una medida de seguridad del proyecto
+
+# ── Red interna personalizada ────────────────────────────────
+networks:
+  red_interna:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.2.9.0/24
+
+# ── Volumen persistente para MongoDB ─────────────────────────
+volumes:
+  mongo_data:
